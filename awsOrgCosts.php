@@ -7,9 +7,14 @@ use Aws\Organizations\OrganizationsClient;
 
 $myAccounts=getAwsOrganizationAccounts();
 foreach($myAccounts as $myAccount){
-  $string=implode("^",$myAccount);
+
   $switch="[[https://signin.aws.amazon.com/switchrole?account=".$myAccount["Id"]."&roleName=OrganizationAccountAccessRole&displayName=".$myAccount["Name"]."|Switch]]";
-  echo "^".$string."^".$switch."^\n";
+  unset( $myAccount["Email"]);
+  unset( $myAccount["Status"]);
+  //unset( $myAccount["Id"]);
+  $string=implode("^",$myAccount);
+
+  echo "^".$string."^".$switch."^EBS^EC2^\n";
   $ec2Client=switchRoleClientEc2($myAccount["Id"],$myAccount["Name"]);
   getIstanceList($ec2Client);
   //die();
@@ -96,7 +101,9 @@ function parseIstanceInfo($ec2Client,$instance){
     print_r($instance["BlockDeviceMappings"]);
     die();
   }*/
+  $sum=0;
   if (isset($instance["BlockDeviceMappings"])){
+
     foreach($instance["BlockDeviceMappings"] as $blockDevice){
         $volume = $ec2Client->describeVolumes([
                   'VolumeIds' => [
@@ -104,9 +111,11 @@ function parseIstanceInfo($ec2Client,$instance){
                 ],
         ]);
         //$myInstance[$blockDevice["Ebs"]["VolumeId"]]= $blockDevice["DeviceName"] ."/".$volume["Volumes"][0]["Size"];
-        $myInstance[$blockDevice["Ebs"]["VolumeId"]]= $volume["Volumes"][0]["Size"]."G";
+        //$myInstance[$blockDevice["Ebs"]["VolumeId"]]= $volume["Volumes"][0]["Size"]."G";
+        $sum=$sum+intval($volume["Volumes"][0]["Size"]);
     }
   }
+  $myInstance["sumVolumes"]=$sum;
   return($myInstance);
 }
 
@@ -127,9 +136,35 @@ function getIstanceList($ec2Client){
     foreach($myInstances as $myInstance){
       unset ($myInstance["ImageId"]);
       unset ($myInstance["PrivateIpAddress"]);
+      unset ($myInstance["PublicIpAddress"]);
       unset ($myInstance["VpcId"]);
+      unset ($myInstance["State"]);
+      $myInstance["EBS"]=0.119*$myInstance["sumVolumes"];
+      unset ($myInstance["sumVolumes"]);
+      //https://aws.amazon.com/it/ec2/pricing/on-demand/
+      switch ($myInstance["InstanceType"]){
+         case "t2.xlarge":
+         $myInstance["Ec2"]=round(0.2144*730.001,2);
+         break;
+         case "t2.large":
+         $myInstance["Ec2"]=round(0.1072*730.001,2);
+         break;
+         case "t2.medium":
+         $myInstance["Ec2"]=round(0.0536*730.001,2);
+         break;
+         case "t2.small":
+         $myInstance["Ec2"]=round(0.0268 *730.001,2);
+         break;
+         case "t2.micro":
+         $myInstance["Ec2"]=round(0.0134*730.001,2);
+         break;
+         case "m4.large":
+         $myInstance["Ec2"]=round(0.12*730.001,2);
+         break;
+      }
       $string=implode("|",$myInstance);
       echo "|".$string."|\n";
+      //print_r($myInstance);
     }
   }else{
     echo "|None|\n";

@@ -1,5 +1,5 @@
 <?php
-require_once("awsOrgSnapShot.inc.php");
+require_once("awsOrgManager.inc.php");
 /*
 AwsSnapShot Account
 */
